@@ -4,18 +4,23 @@ const sharp = require("sharp");
 const app = express();
 app.use(express.json());
 
-app.post("/generate-mask", async (req, res) => {
-  const { width, height, targetSize } = req.body;
+app.get("/mask", async (req, res) => {
+  const { width, height, targetSize } = req.query;
 
-  if (!width || !height || !targetSize) {
-    return res.status(400).json({ error: "Missing required fields" });
+  // Преобразуем параметры в числа
+  const w = parseInt(width, 10);
+  const h = parseInt(height, 10);
+  const size = parseInt(targetSize, 10);
+
+  if (!w || !h || !size) {
+    return res.status(400).json({ error: "Missing required query params" });
   }
 
   try {
     const background = sharp({
       create: {
-        width: targetSize,
-        height: targetSize,
+        width: size,
+        height: size,
         channels: 1,
         background: { r: 0, g: 0, b: 0 }
       }
@@ -23,8 +28,8 @@ app.post("/generate-mask", async (req, res) => {
 
     const whiteBox = await sharp({
       create: {
-        width,
-        height,
+        width: w,
+        height: h,
         channels: 1,
         background: { r: 255, g: 255, b: 255 }
       }
@@ -34,8 +39,8 @@ app.post("/generate-mask", async (req, res) => {
       .composite([
         {
           input: whiteBox,
-          top: Math.floor((targetSize - height) / 2),
-          left: Math.floor((targetSize - width) / 2)
+          top: Math.floor((size - h) / 2),
+          left: Math.floor((size - w) / 2)
         }
       ])
       .png()
