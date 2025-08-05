@@ -1,26 +1,62 @@
 const express = require("express");
+const sharp = require("sharp");
+
 const app = express();
 
-app.get("/mask", (req, res) => {
+app.get("/mask", async (req, res) => {
   const { width, height, targetSize } = req.query;
 
-  const w = parseInt(width, 10);
-  const h = parseInt(height, 10);
-  const t = parseInt(targetSize, 10);
-
-  if (!w || !h || !t) {
-    return res.status(400).json({ error: "Missing or invalid parameters" });
+  // Проверка на обязательные параметры
+  if (!width || !height || !targetSize) {
+    return res.status(400).json({ error: "Missing required parameters" });
   }
 
-  const result = {
-    doubleWidth: w * 2,
-    doubleHeight: h * 2,
-    doubleTargetSize: t * 2
-  };
+  try {
+    // Приведение параметров к числам
+    const w = parseInt(width);
+    const h = parseInt(height);
+    const size = parseInt(targetSize);
 
-  res.json(result);
+    // Чёрный квадрат (фон)
+    const background = sharp({
+      create: {
+        width: size,
+        height: size,
+        channels: 3,
+        background: { r: 0, g: 0, b: 0 }
+      }
+    });
+
+    // Белый прямоугольник (внутри)
+    const whiteBox = await sharp({
+      create: {
+        width: w,
+        height: h,
+        channels: 3,
+        background: { r: 255, g: 255, b: 255 }
+      }
+    }).png().toBuffer();
+
+    // Наложение белого прямоугольника по центру чёрного фона
+    const mask = await background
+      .composite([
+        {
+          input: whiteBox,
+          top: Math.floor((size - h) / 2),
+          left: Math.floor((size - w) / 2),
+        },
+      ])
+      .png()
+      .toBuffer();
+
+    res.set("Content-Type", "image/png").send(mask);
+  } catch (err) {
+    console.error("Mask generation error:", err);
+    res.status(500).json({ error: "Failed to generate mask" });
+  }
 });
 
-app.listen(3000, () => {
-  console.log("🟢 Test server running on http://localhost:3000");
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`✅ Mask generator running on http://localhost:${PORT}`);
 });
