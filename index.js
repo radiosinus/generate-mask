@@ -7,48 +7,53 @@ app.use(express.json());
 app.get("/mask", async (req, res) => {
   const { width, height, targetSize } = req.query;
 
-  // Преобразуем параметры в числа
+  // Преобразуем строки в числа
   const w = parseInt(width, 10);
   const h = parseInt(height, 10);
-  const size = parseInt(targetSize, 10);
+  const t = parseInt(targetSize, 10);
 
-  if (!w || !h || !size) {
-    return res.status(400).json({ error: "Missing required query params" });
+  if (!w || !h || !t) {
+    return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
+    // Прозрачный квадрат
     const background = sharp({
       create: {
-        width: size,
-        height: size,
-        channels: 1,
-        background: { r: 0, g: 0, b: 0 }
-      }
+        width: t,
+        height: t,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
     });
 
+    // Белый прямоугольник
     const whiteBox = await sharp({
       create: {
         width: w,
         height: h,
-        channels: 1,
-        background: { r: 255, g: 255, b: 255 }
-      }
-    }).png().toBuffer();
+        channels: 4,
+        background: { r: 255, g: 255, b: 255, alpha: 1 },
+      },
+    })
+      .png()
+      .toBuffer();
 
+    // Скомпонуем в центр
     const maskBuffer = await background
       .composite([
         {
           input: whiteBox,
-          top: Math.floor((size - h) / 2),
-          left: Math.floor((size - w) / 2)
-        }
+          top: Math.floor((t - h) / 2),
+          left: Math.floor((t - w) / 2),
+        },
       ])
       .png()
       .toBuffer();
 
     res.set("Content-Type", "image/png").send(maskBuffer);
   } catch (error) {
-    console.error("Error generating mask:", error);
+    console.error("❌ Error generating mask:", error);
     res.status(500).json({ error: "Failed to generate mask" });
   }
 });
